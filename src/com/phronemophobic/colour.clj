@@ -1,3 +1,5 @@
+;; copied from https://github.com/adam-james-v/engtool/blob/6288dd47200a1eb6aa22972346e1c31d0cdc21d9/src/engtool/colour.clj
+
 (ns com.phronemophobic.colour
   (:import (java.util Random)))
 
