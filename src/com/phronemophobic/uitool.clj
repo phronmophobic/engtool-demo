@@ -1,6 +1,7 @@
 (ns com.phronemophobic.uitool
   (:require [membrane.ui :as ui]
             [membrane.basic-components :as basic]
+            [membrane.skia :as skia]
             [clojure.core.async :as async]
             [membrane.component :as component
              :refer [defui defeffect]]
@@ -50,7 +51,7 @@
                        (fn [_]
                          [[::counter-inc $num max]])})
         el  [(ui/with-color [0 0 0 0]
-              (ui/rectangle w 1))
+               (ui/rectangle w 1))
              (ui/center lbl [w glyph-height])
              bm
              (ui/translate (- w (ui/width bp)) 0 bp)]]
@@ -224,7 +225,7 @@
 (defui inputs-viewer [{:keys [input-views input-values seed width height fncall view-width view-height viz]}]
   [ ;; background
    (ui/with-color (:bg (col/random-cols seed))
-    (ui/rectangle (* 3 width) (* 3 height)))
+     (ui/rectangle (* 3 width) (* 3 height)))
    ;; 2 Column layout begins here.
    (ui/horizontal-layout
     
@@ -238,13 +239,13 @@
        ;; Description
        [(when (:description fncall)
           (ui/with-color
-           (:fg (col/random-cols seed))
-           (ui/label (:description fncall))))]
+            (:fg (col/random-cols seed))
+            (ui/label (:description fncall))))]
        
        ;; Applet Title
        [(ui/with-color
-         (:fg (col/random-cols seed))
-         (ui/label (str (:app-name fncall) "\n") title-font))]
+          (:fg (col/random-cols seed))
+          (ui/label (str (:app-name fncall) "\n") title-font))]
        
        )))
     
@@ -260,22 +261,22 @@
                      computed-view-input-values]} viz
              update-label (ui/label "updating..." font)]
          [(if (not= computed-view-input-values
-                       input-values)
+                    input-values)
             update-label
             (ui/spacer (ui/width update-label) (ui/height update-label)))
           (ui/scissor-view
-            [0 0] [view-width view-width]
-            [(ui/no-events
-              (ui/with-style :membrane.ui/style-stroke
-                             (ui/with-color
-                              (:fg (col/random-cols seed))
-                              (ui/rectangle view-width view-width))))
-             (ui/with-color (:fg (col/random-cols seed))
-                            [computed-view])])])
+           [0 0] [view-width view-width]
+           [(ui/no-events
+             (ui/with-style :membrane.ui/style-stroke
+               (ui/with-color
+                 (:fg (col/random-cols seed))
+                 (ui/rectangle view-width view-width))))
+            (ui/with-color (:fg (col/random-cols seed))
+              [computed-view])])])
        
        ;; INPUTS
        [[(ui/with-color [0 0 0 0]
-                        (ui/rectangle view-width 1))
+           (ui/rectangle view-width 1))
          (apply
           ui/vertical-layout
           (concat
@@ -295,7 +296,7 @@
                                        :$input $input))))
                        (map (fn [view]
                               (ui/with-color (:fg (col/random-cols seed)) 
-                                             view))))
+                                view))))
                  input-views)))]]))))])
 
 (defn show [spec]
@@ -316,20 +317,20 @@
         
         async-thread
         (async/thread
-         (try
-           (let [->view (-> initial-state
-                            :fncall
-                            :viz)]
-             (loop []
-               (let [input-values (async/<!! update-viz-chan)
-                     computed-view (->view input-values)]
-                 (swap! atm assoc :viz {:computed-view computed-view
-                                        :computed-view-input-values input-values}))
-               
-               (recur)))
-           (catch Throwable e
-             (tap> e)
-             (println "error. quitting..."))))]
+          (try
+            (let [->view (-> initial-state
+                             :fncall
+                             :viz)]
+              (loop []
+                (let [input-values (async/<!! update-viz-chan)
+                      computed-view (->view input-values)]
+                  (swap! atm assoc :viz {:computed-view computed-view
+                                         :computed-view-input-values input-values}))
+
+                (recur)))
+            (catch Throwable e
+              (tap> e)
+              (println "error. quitting..."))))]
     (add-watch atm ::update-viz
                (fn [k ref old new]
                  (let [old-inputs (-> old :viz :computed-view-input-values)
@@ -337,10 +338,15 @@
                    (when (not= old-inputs
                                current-inputs)
                      (async/put! update-viz-chan current-inputs)))))
-    (skia/run app
-              {:window-start-width (:width initial-state)
-               :window-start-height (:height initial-state)
-               :window-title (-> initial-state :fncall :app-name)})))
+    (async/put! update-viz-chan (:input-values initial-state))
+
+    ((if (:sync? spec)
+       skia/run-sync
+       skia/run)
+     app
+     {:window-start-width (:width initial-state)
+      :window-start-height (:height initial-state)
+      :window-title (-> initial-state :fncall :app-name)})))
 
 (comment
   
@@ -354,7 +360,14 @@
                          :min      0
                          :max      360
                          :integer? false
-                         :value    45}}
+                         :value    45}
+                 :count {:type :counter
+                         :value 42
+                         :min 1
+                         :max 100}
+                 :text {:type :text
+                        :coerce :int
+                        :value "10"}}
     
     :seed 1
     :width 800
@@ -374,3 +387,38 @@
   
   ,)
 
+(defn -main [& args]
+  (show
+   {:sync? true
+    :input-spec {:gap   {:type     :slider
+                         :min      0
+                         :max      1.01
+                         :integer? false
+                         :value    0.3}
+                 :deg-a {:type     :slider
+                         :min      0
+                         :max      360
+                         :integer? false
+                         :value    45}
+                 :count {:type :counter
+                         :value 42
+                         :min 1
+                         :max 100}
+                 :text {:type :text
+                        :coerce :int
+                        :value "10"}}
+    
+    :seed 1
+    :width 800
+    :height 800
+    :view-width 200
+    :view-height 200
+    :fncall {:description "test description"
+             :app-name "test app name"
+             :viz (fn [{:keys [gap deg-a]}]
+                    (Thread/sleep 2000)
+                    (ui/vertical-layout
+                     (ui/label (format "%.02f" (double gap)))
+                     (ui/label (format "%.02f" (double deg-a)))))}})
+
+  )
