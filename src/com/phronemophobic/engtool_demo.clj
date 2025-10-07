@@ -1,4 +1,4 @@
-(ns com.phronemophobic.uitool
+(ns com.phronemophobic.engtool-demo
   (:require [membrane.ui :as ui]
             [membrane.basic-components :as basic]
             [membrane.skia :as skia]
